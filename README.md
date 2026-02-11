@@ -85,6 +85,15 @@ Add the following to your `.claude/settings.json` (project-level or global `~/.c
             "command": "bash /absolute/path/to/claude-second-screen/hooks/notify-waiting.sh"
           }
         ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /absolute/path/to/claude-second-screen/hooks/set-idle.sh"
+          }
+        ]
       }
     ]
   }
