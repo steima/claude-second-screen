@@ -10,6 +10,12 @@ if [ -n "$AGENT_TYPE" ]; then
 fi
 
 DASHBOARD_URL="${CLAUDE_SECOND_SCREEN_URL:-http://localhost:3456}"
+
+# Immediately mark session as busy (fast, reliable status change)
+curl -s -X PUT "${DASHBOARD_URL}/api/sessions" \
+  -H 'Content-Type: application/json' \
+  -d "{\"directory\": \"$(pwd)\", \"status\": \"busy\"}" > /dev/null 2>&1 &
+
 PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty')
 
 # Extract a short summary from the prompt (first 80 chars, collapsed whitespace)
@@ -40,16 +46,16 @@ done
 
 ISSUES="${ISSUES}]"
 
-# Build payload — only include githubIssues if any were found
+# Send refinement with summary and issues (status already set above)
 if [ "$ISSUES" = "[]" ]; then
   jq -n --arg dir "$(pwd)" --arg summary "$SUMMARY" \
-    '{directory: $dir, status: "busy", summary: $summary}' |
+    '{directory: $dir, summary: $summary}' |
   curl -s -X PUT "${DASHBOARD_URL}/api/sessions" \
     -H 'Content-Type: application/json' \
     -d @- > /dev/null 2>&1 &
 else
   jq -n --arg dir "$(pwd)" --arg summary "$SUMMARY" --argjson issues "$ISSUES" \
-    '{directory: $dir, status: "busy", summary: $summary, githubIssues: $issues}' |
+    '{directory: $dir, summary: $summary, githubIssues: $issues}' |
   curl -s -X PUT "${DASHBOARD_URL}/api/sessions" \
     -H 'Content-Type: application/json' \
     -d @- > /dev/null 2>&1 &

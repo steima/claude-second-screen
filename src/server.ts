@@ -68,20 +68,10 @@ app.put('/api/sessions', (req: Request, res: Response) => {
     return;
   }
 
-  let session = sessions.get(directory);
+  const session = sessions.get(directory);
   if (!session) {
-    // Auto-register if not found
-    session = {
-      directory,
-      directoryName: path.basename(directory),
-      summary: '',
-      status: 'idle',
-      githubIssues: [],
-      tasks: [],
-      createdAt: new Date().toISOString(),
-      lastUpdated: new Date().toISOString(),
-    };
-    sessions.set(directory, session);
+    res.status(404).json({ error: 'Session not found. Register via POST first.' });
+    return;
   }
 
   if (summary !== undefined) session.summary = summary;
