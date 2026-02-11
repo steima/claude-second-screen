@@ -99,18 +99,9 @@ app.put('/api/sessions', (req: Request, res: Response) => {
       session = sessions.get(parentDir)!;
       isSubdirRouted = true;
     } else {
-      console.log(`[PUT]   no existing session found — auto-creating`);
-      session = {
-        directory,
-        directoryName: path.basename(directory),
-        summary: '',
-        status: 'idle',
-        githubIssues: [],
-        tasks: [],
-        createdAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
-      };
-      sessions.set(directory, session);
+      console.log(`[PUT]   no existing session found — ignoring`);
+      res.status(404).json({ error: 'Session not found' });
+      return;
     }
   } else {
     console.log(`[PUT]   exact match found`);

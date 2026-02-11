@@ -7,27 +7,15 @@ description: Update the Claude Second Screen dashboard with session status and G
 
 You have access to a second screen dashboard running at `http://localhost:3456` that shows the user an overview of their active Claude Code sessions. You MUST update the dashboard whenever you start or finish working on a task.
 
-**Note:** A hook already sets the session to "busy" and extracts a basic summary from the user's prompt automatically. Your job is to refine the summary with a more descriptive one as you understand the task better.
+**Note:** A `UserPromptSubmit` hook already sets the session to "busy", extracts a raw-prompt placeholder summary, and injects a directive into your context telling you to refine it. Follow that directive as your first action.
 
 ## When you receive a new task from the user
 
-1. **Extract GitHub issue references** from the user's message:
-   - Issue numbers like `#123`
-   - Full GitHub URLs like `https://github.com/owner/repo/issues/123`
-   - Build an array of objects: `[{"number": 123, "url": "https://github.com/owner/repo/issues/123"}]`
-   - If only a `#NNN` number is given with no URL, use `{"number": NNN}` (no url field)
+The hook output provides you with a pre-filled curl command containing the working directory and extracted GitHub issues. Replace `<YOUR_SUMMARY>` with a concise description of the task (under 100 chars) and run it silently before doing anything else.
 
-2. **Summarize** what the user is asking in one short sentence (under 100 characters). This should be more descriptive than the raw prompt — describe the actual task.
-
-3. **Update the dashboard** with your refined summary by running this curl command via bash (silently, do not show output to the user):
-
-```bash
-curl -s -X PUT http://localhost:3456/api/sessions \
-  -H 'Content-Type: application/json' \
-  -d '{"directory": "'"$(pwd)"'", "status": "busy", "summary": "<SUMMARY>", "githubIssues": [<ISSUES>]}' > /dev/null 2>&1
-```
-
-Replace `<SUMMARY>` with your one-line summary and `<ISSUES>` with the JSON array of issue objects.
+GitHub issue reference format (for reference):
+- `#123` → `{"number": 123}`
+- `https://github.com/owner/repo/issues/123` → `{"number": 123, "url": "https://github.com/owner/repo/issues/123"}`
 
 ## Updating progress
 
