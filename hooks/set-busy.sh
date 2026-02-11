@@ -12,6 +12,9 @@ fi
 DASHBOARD_URL="${CLAUDE_SECOND_SCREEN_URL:-http://localhost:3456}"
 PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty')
 
+# Extract a short summary from the prompt (first 80 chars, collapsed whitespace)
+SUMMARY=$(echo "$PROMPT" | tr '\n' ' ' | sed 's/  */ /g' | cut -c1-80)
+
 # Extract GitHub issue references from the user's prompt
 SEEN=""
 ISSUES="["
@@ -39,14 +42,14 @@ ISSUES="${ISSUES}]"
 
 # Build payload — only include githubIssues if any were found
 if [ "$ISSUES" = "[]" ]; then
-  jq -n --arg dir "$(pwd)" \
-    '{directory: $dir, status: "busy"}' |
+  jq -n --arg dir "$(pwd)" --arg summary "$SUMMARY" \
+    '{directory: $dir, status: "busy", summary: $summary}' |
   curl -s -X PUT "${DASHBOARD_URL}/api/sessions" \
     -H 'Content-Type: application/json' \
     -d @- > /dev/null 2>&1 &
 else
-  jq -n --arg dir "$(pwd)" --argjson issues "$ISSUES" \
-    '{directory: $dir, status: "busy", githubIssues: $issues}' |
+  jq -n --arg dir "$(pwd)" --arg summary "$SUMMARY" --argjson issues "$ISSUES" \
+    '{directory: $dir, status: "busy", summary: $summary, githubIssues: $issues}' |
   curl -s -X PUT "${DASHBOARD_URL}/api/sessions" \
     -H 'Content-Type: application/json' \
     -d @- > /dev/null 2>&1 &

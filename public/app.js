@@ -113,11 +113,6 @@ function cardHTML(session) {
         </div>`
       : '';
 
-  const summaryHTML =
-    session.status !== 'idle' && session.summary
-      ? `<div class="card-summary">${escapeHTML(session.summary)}</div>`
-      : '';
-
   const now = Date.now();
   const visibleTasks = (session.tasks || []).filter((t) => {
     if (!t.completed || !t.completedAt) return true;
@@ -160,8 +155,7 @@ function cardHTML(session) {
         <span class="card-status-label">${statusLabels[session.status] || session.status}</span>
         <button class="card-remove" title="Remove session">&times;</button>
       </div>
-      <div class="card-path">${escapeHTML(session.directory)}</div>
-      ${summaryHTML}
+      <div class="card-path" title="${escapeAttr(session.directory)}">${escapeHTML(session.summary || session.directory)}</div>
       ${issuesHTML}
       ${tasksHTML}
       <div class="add-task">
