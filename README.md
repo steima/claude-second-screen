@@ -78,7 +78,7 @@ Add the following to your `.claude/settings.json` (project-level or global `~/.c
     ],
     "Notification": [
       {
-        "matcher": "",
+        "matcher": "permission_prompt|elicitation_dialog",
         "hooks": [
           {
             "type": "command",
