@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Second Screen</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <h1>Claude Second Screen</h1>
+      <p class="subtitle">Active coding sessions</p>
+    </div>
+    <div class="connection-status" id="connectionStatus">
+      <span class="status-dot"></span>
+      <span class="status-text">Connected</span>
+    </div>
+  </header>
+
+  <main id="dashboard" class="dashboard"></main>
+
+  <div id="emptyState" class="empty-state">
+    <div class="empty-icon">&#9678;</div>
+    <p class="empty-title">No active sessions</p>
+    <p class="empty-subtitle">Start a Claude Code session to see it here</p>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

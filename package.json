@@ -1,0 +1,22 @@
+{
+  "name": "claude-second-screen",
+  "version": "1.0.0",
+  "description": "A second screen dashboard to track Claude coding sessions",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.13.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "license": "MIT"
+}
