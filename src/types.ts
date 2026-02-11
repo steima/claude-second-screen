@@ -7,6 +7,7 @@ export interface Task {
   id: string;
   text: string;
   completed: boolean;
+  completedAt?: string;
 }
 
 export type SessionStatus = 'idle' | 'busy' | 'waiting';

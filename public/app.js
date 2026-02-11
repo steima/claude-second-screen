@@ -21,23 +21,72 @@ function setConnected(connected) {
   el.querySelector('.status-text').textContent = connected ? 'Connected' : 'Disconnected';
 }
 
+function getSortMode() {
+  return document.getElementById('sortSelect').value;
+}
+
+function isGrouped() {
+  return document.getElementById('groupToggle').classList.contains('active');
+}
+
+function applySortWithin(sessions) {
+  const mode = getSortMode();
+  if (mode === 'alpha') {
+    sessions.sort((a, b) => a.directoryName.localeCompare(b.directoryName));
+  } else if (mode === 'recent') {
+    sessions.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+  } else {
+    // Default: status priority — waiting first, then busy, then idle
+    const order = { waiting: 0, busy: 1, idle: 2 };
+    sessions.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+  }
+}
+
+function renderGrouped(sessions) {
+  const groups = [
+    { key: 'waiting', label: 'Awaiting Input' },
+    { key: 'busy', label: 'Active' },
+    { key: 'idle', label: 'Idle' },
+  ];
+
+  return groups
+    .map((g) => {
+      const items = sessions.filter((s) => s.status === g.key);
+      if (items.length === 0) return '';
+      applySortWithin(items);
+      return `
+        <section class="status-group">
+          <h2 class="group-heading ${g.key}">${g.label}<span class="group-count">${items.length}</span></h2>
+          <div class="group-grid">
+            ${items.map((s) => cardHTML(s)).join('')}
+          </div>
+        </section>`;
+    })
+    .join('');
+}
+
 function render(sessions) {
   const dashboard = document.getElementById('dashboard');
   const emptyState = document.getElementById('emptyState');
 
   if (!sessions || sessions.length === 0) {
     dashboard.innerHTML = '';
+    dashboard.classList.remove('grouped');
     emptyState.classList.add('visible');
     return;
   }
 
   emptyState.classList.remove('visible');
 
-  // Sort: waiting first, then busy, then idle
-  const order = { waiting: 0, busy: 1, idle: 2 };
-  sessions.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+  if (isGrouped()) {
+    dashboard.classList.add('grouped');
+    dashboard.innerHTML = renderGrouped(sessions);
+  } else {
+    dashboard.classList.remove('grouped');
+    applySortWithin(sessions);
+    dashboard.innerHTML = sessions.map((s) => cardHTML(s)).join('');
+  }
 
-  dashboard.innerHTML = sessions.map((s) => cardHTML(s)).join('');
   attachCardListeners();
 }
 
@@ -69,21 +118,33 @@ function cardHTML(session) {
       ? `<div class="card-summary">${escapeHTML(session.summary)}</div>`
       : '';
 
+  const now = Date.now();
+  const visibleTasks = (session.tasks || []).filter((t) => {
+    if (!t.completed || !t.completedAt) return true;
+    return now - new Date(t.completedAt).getTime() < 6 * 60 * 1000;
+  });
+
   const tasksHTML =
-    session.tasks && session.tasks.length > 0
+    visibleTasks.length > 0
       ? `<hr class="card-divider">
         <div class="card-tasks">
           <div class="card-tasks-title">Tasks</div>
-          ${session.tasks
-            .map(
-              (t) => `
-            <div class="task-item" data-dir="${escapeAttr(session.directory)}" data-task-id="${escapeAttr(t.id)}">
+          ${visibleTasks
+            .map((t) => {
+              let fadeClass = '';
+              if (t.completed && t.completedAt) {
+                const elapsed = now - new Date(t.completedAt).getTime();
+                if (elapsed >= 3 * 60 * 1000) fadeClass = 'fade-heavy';
+                else if (elapsed >= 60 * 1000) fadeClass = 'fade-light';
+              }
+              return `
+            <div class="task-item ${fadeClass}" data-dir="${escapeAttr(session.directory)}" data-task-id="${escapeAttr(t.id)}">
               <input type="checkbox" ${t.completed ? 'checked' : ''} title="Toggle task">
               <span class="task-text ${t.completed ? 'completed' : ''}">${escapeHTML(t.text)}</span>
               <button class="task-delete" title="Delete task">&times;</button>
             </div>
-          `
-            )
+          `;
+            })
             .join('')}
         </div>`
       : `<hr class="card-divider">
@@ -180,7 +241,10 @@ async function addTask(dir, triggerEl) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ directory: dir, text }),
   });
-  poll();
+  await poll();
+  // Re-focus the add-task input on the same card after re-render
+  const card = document.querySelector(`.card[data-dir="${CSS.escape(dir)}"]`);
+  if (card) card.querySelector('.add-task input').focus();
 }
 
 async function poll() {
@@ -203,6 +267,30 @@ function escapeHTML(str) {
 function escapeAttr(str) {
   return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+// Sort widget — re-render on change and persist preference
+const sortSelect = document.getElementById('sortSelect');
+const savedSort = localStorage.getItem('sortMode');
+if (savedSort) sortSelect.value = savedSort;
+
+sortSelect.addEventListener('change', () => {
+  localStorage.setItem('sortMode', sortSelect.value);
+  previousData = null;
+  poll();
+});
+
+// Group toggle — re-render on click and persist preference
+const groupToggle = document.getElementById('groupToggle');
+if (localStorage.getItem('grouped') === 'true') {
+  groupToggle.classList.add('active');
+}
+
+groupToggle.addEventListener('click', () => {
+  groupToggle.classList.toggle('active');
+  localStorage.setItem('grouped', groupToggle.classList.contains('active'));
+  previousData = null;
+  poll();
+});
 
 // Start polling
 poll();

@@ -150,7 +150,10 @@ app.put('/api/sessions/tasks', (req: Request, res: Response) => {
   }
 
   if (text !== undefined) task.text = text;
-  if (completed !== undefined) task.completed = completed;
+  if (completed !== undefined) {
+    task.completed = completed;
+    task.completedAt = completed ? new Date().toISOString() : undefined;
+  }
   session.lastUpdated = new Date().toISOString();
   res.json(task);
 });

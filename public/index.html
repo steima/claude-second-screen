@@ -12,9 +12,20 @@
       <h1>Claude Second Screen</h1>
       <p class="subtitle">Active coding sessions</p>
     </div>
-    <div class="connection-status" id="connectionStatus">
-      <span class="status-dot"></span>
-      <span class="status-text">Connected</span>
+    <div class="header-right">
+      <button class="group-toggle" id="groupToggle" title="Group by status">Group</button>
+      <div class="sort-widget">
+        <label class="sort-label" for="sortSelect">Sort</label>
+        <select id="sortSelect" class="sort-select">
+          <option value="status">Status</option>
+          <option value="recent">Recent activity</option>
+          <option value="alpha">Alphabetical</option>
+        </select>
+      </div>
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-dot"></span>
+        <span class="status-text">Connected</span>
+      </div>
     </div>
   </header>
 
