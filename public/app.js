@@ -152,7 +152,7 @@ function cardHTML(session) {
       <div class="card-header">
         <div class="status-indicator"></div>
         <span class="card-dir-name">${escapeHTML(session.directoryName)}</span>
-        <span class="card-status-label">${statusLabels[session.status] || session.status}</span>
+        <span class="card-status-label${session.status === 'waiting' ? ' clickable' : ''}">${statusLabels[session.status] || session.status}</span>
         <button class="card-remove" title="Remove session">&times;</button>
       </div>
       <div class="card-path" title="${escapeAttr(session.directory)}">${escapeHTML(session.summary || session.directory)}</div>
@@ -206,6 +206,21 @@ function attachCardListeners() {
   document.querySelectorAll('.add-task input').forEach((input) => {
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') addTask(input.dataset.dir, input);
+    });
+  });
+
+  // Click "Awaiting Input" to mark session as idle
+  document.querySelectorAll('.card-status-label.clickable').forEach((label) => {
+    label.addEventListener('click', async () => {
+      const card = label.closest('.card');
+      const dir = card.dataset.dir;
+      if (!confirm('Mark this session as idle?')) return;
+      await fetch(`${API}/api/sessions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directory: dir, status: 'idle' }),
+      });
+      poll();
     });
   });
 
