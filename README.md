@@ -54,6 +54,28 @@ Add the following to your `.claude/settings.json` (project-level or global `~/.c
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /absolute/path/to/claude-second-screen/hooks/set-busy.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /absolute/path/to/claude-second-screen/hooks/set-idle.sh"
+          }
+        ]
+      }
+    ],
     "Notification": [
       {
         "matcher": "",
