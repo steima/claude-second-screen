@@ -87,6 +87,7 @@ app.put('/api/sessions', (req: Request, res: Response) => {
   console.log(`[PUT]   incoming fields: status=${status ?? '(none)'}, summary=${summary !== undefined ? `"${summary.slice(0, 80)}"` : '(none)'}, githubIssues=${githubIssues ? `[${githubIssues.length}]` : '(none)'}`);
 
   let session = sessions.get(directory);
+  let isSubdirRouted = false;
   if (!session) {
     // If this directory is a child of an existing session, attribute the
     // update to the parent session instead of creating a ghost card.
@@ -96,6 +97,7 @@ app.put('/api/sessions', (req: Request, res: Response) => {
     if (parentDir) {
       console.log(`[PUT]   matched as subdirectory of "${parentDir}"`);
       session = sessions.get(parentDir)!;
+      isSubdirRouted = true;
     } else {
       console.log(`[PUT]   no existing session found — auto-creating`);
       session = {
@@ -116,7 +118,7 @@ app.put('/api/sessions', (req: Request, res: Response) => {
 
   const prevStatus = session.status;
   if (summary !== undefined) session.summary = summary;
-  if (status !== undefined) session.status = status;
+  if (status !== undefined && !isSubdirRouted) session.status = status;
   if (githubIssues !== undefined) session.githubIssues = githubIssues;
   session.lastUpdated = new Date().toISOString();
 
