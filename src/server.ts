@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { createServer } from 'http';
@@ -9,6 +10,11 @@ const app = express();
 const PORT = process.env.PORT || 3456;
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
+
+const DATA_DIR = process.env.CLAUDE_SECOND_SCREEN_DATA_DIR
+  || path.join(import.meta.dirname, '..', 'data');
+const DATA_FILE = path.join(DATA_DIR, 'sessions.json');
+const DATA_FILE_TMP = path.join(DATA_DIR, 'sessions.json.tmp');
 
 app.use(express.json());
 
@@ -25,6 +31,60 @@ app.use(express.static(path.join(import.meta.dirname, '..', 'public')));
 
 // In-memory session store, keyed by directory path
 const sessions = new Map<string, Session>();
+
+// --- Persistence ---
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function loadSessions(): void {
+  try {
+    const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+    const entries: Session[] = JSON.parse(raw);
+    for (const session of entries) {
+      sessions.set(session.directory, session);
+    }
+    console.log(`[persistence] loaded ${entries.length} session(s) from ${DATA_FILE}`);
+  } catch (err: any) {
+    if (err.code === 'ENOENT') {
+      console.log(`[persistence] no data file found — starting fresh`);
+    } else {
+      console.warn(`[persistence] failed to load sessions — starting fresh:`, err.message);
+    }
+  }
+}
+
+function saveSessions(): void {
+  try {
+    const data = JSON.stringify(Array.from(sessions.values()), null, 2);
+    fs.writeFileSync(DATA_FILE_TMP, data, 'utf-8');
+    fs.renameSync(DATA_FILE_TMP, DATA_FILE);
+  } catch (err: any) {
+    console.error(`[persistence] failed to save sessions:`, err.message);
+  }
+}
+
+function scheduleSave(): void {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    saveSessions();
+  }, 1000);
+}
+
+function shutdown(): void {
+  console.log(`[persistence] shutting down — flushing pending save`);
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    saveSessions();
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+// --- End Persistence ---
 
 function generateId(): string {
   return crypto.randomBytes(4).toString('hex');
@@ -54,23 +114,28 @@ app.get('/api/sessions', (_req: Request, res: Response) => {
 
 // POST /api/sessions — register a new session (or re-register)
 app.post('/api/sessions', (req: Request, res: Response) => {
-  const { directory } = req.body as { directory?: string };
+  const { directory, source } = req.body as { directory?: string; source?: string };
   if (!directory) {
     res.status(400).json({ error: 'directory is required' });
     return;
   }
 
-  console.log(`[POST] directory="${directory}"`);
+  console.log(`[POST] directory="${directory}" source="${source ?? 'startup'}"`);
 
   const existing = sessions.get(directory);
   if (existing) {
-    console.log(`[POST]   re-registering existing session, resetting to idle`);
     existing.status = 'idle';
-    existing.summary = '';
-    existing.githubIssues = [];
+    if (source !== 'resume' && source !== 'compact') {
+      console.log(`[POST]   re-registering existing session, resetting summary`);
+      existing.summary = '';
+      existing.githubIssues = [];
+    } else {
+      console.log(`[POST]   resuming existing session, preserving summary`);
+    }
     existing.lastUpdated = new Date().toISOString();
     res.json(existing);
     broadcast();
+    scheduleSave();
     return;
   }
 
@@ -89,6 +154,7 @@ app.post('/api/sessions', (req: Request, res: Response) => {
   sessions.set(directory, session);
   res.status(201).json(session);
   broadcast();
+  scheduleSave();
 });
 
 // PUT /api/sessions — update a session
@@ -145,10 +211,17 @@ app.put('/api/sessions', (req: Request, res: Response) => {
   if (githubIssues !== undefined) session.githubIssues = githubIssues;
   session.lastUpdated = new Date().toISOString();
 
+  // Skip broadcast if nothing actually changed (e.g. repeated busy→busy from PreToolUse)
+  if (summary === undefined && githubIssues === undefined && session.status === prevStatus) {
+    res.json(session);
+    return;
+  }
+
   console.log(`[PUT]   result: session="${session.directory}" status=${prevStatus}->${session.status}`);
 
   res.json(session);
   broadcast();
+  scheduleSave();
 });
 
 // DELETE /api/sessions — remove a session
@@ -162,6 +235,7 @@ app.delete('/api/sessions', (req: Request, res: Response) => {
   sessions.delete(directory);
   res.status(204).end();
   broadcast();
+  scheduleSave();
 });
 
 // POST /api/sessions/tasks — add a task to a session
@@ -184,6 +258,7 @@ app.post('/api/sessions/tasks', (req: Request, res: Response) => {
   console.log(`[POST tasks] directory="${directory}" task="${text.slice(0, 60)}" id=${task.id}`);
   res.status(201).json(task);
   broadcast();
+  scheduleSave();
 });
 
 // PUT /api/sessions/tasks — update a task
@@ -221,6 +296,7 @@ app.put('/api/sessions/tasks', (req: Request, res: Response) => {
   console.log(`[PUT tasks] directory="${directory}" taskId=${taskId} completed=${task.completed}`);
   res.json(task);
   broadcast();
+  scheduleSave();
 });
 
 // DELETE /api/sessions/tasks — delete a task
@@ -242,7 +318,12 @@ app.delete('/api/sessions/tasks', (req: Request, res: Response) => {
   console.log(`[DELETE tasks] directory="${directory}" taskId=${taskId}`);
   res.status(204).end();
   broadcast();
+  scheduleSave();
 });
+
+// --- Startup ---
+fs.mkdirSync(DATA_DIR, { recursive: true });
+loadSessions();
 
 server.listen(PORT, () => {
   console.log(`Claude Second Screen dashboard running at http://localhost:${PORT}`);
