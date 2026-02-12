@@ -10,7 +10,7 @@ app.use(express.json());
 
 // Log every request
 app.use((req, _res, next) => {
-  if (req.path.startsWith('/api/')) {
+  if (req.path.startsWith('/api/') && req.method !== 'GET') {
     const body = req.body && Object.keys(req.body).length > 0 ? ` body=${JSON.stringify(req.body)}` : '';
     console.log(`[${req.method}] ${req.path}${body}`);
   }
@@ -109,7 +109,16 @@ app.put('/api/sessions', (req: Request, res: Response) => {
 
   const prevStatus = session.status;
   if (summary !== undefined) session.summary = summary;
-  if (status !== undefined && !isSubdirRouted) session.status = status;
+  if (status !== undefined) {
+    if (isSubdirRouted) {
+      const priority: Record<string, number> = { idle: 0, busy: 1, waiting: 2 };
+      if ((priority[status] ?? 0) > (priority[session.status] ?? 0)) {
+        session.status = status;
+      }
+    } else {
+      session.status = status;
+    }
+  }
   if (githubIssues !== undefined) session.githubIssues = githubIssues;
   session.lastUpdated = new Date().toISOString();
 
