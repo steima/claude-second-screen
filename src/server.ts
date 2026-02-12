@@ -1,10 +1,14 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import crypto from 'crypto';
+import { createServer } from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 import { Session, SessionStatus, GitHubIssue } from './types.js';
 
 const app = express();
 const PORT = process.env.PORT || 3456;
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
 
 app.use(express.json());
 
@@ -25,6 +29,23 @@ const sessions = new Map<string, Session>();
 function generateId(): string {
   return crypto.randomBytes(4).toString('hex');
 }
+
+function broadcast(): void {
+  const data = JSON.stringify(Array.from(sessions.values()));
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
+    }
+  }
+}
+
+wss.on('connection', (ws) => {
+  console.log(`[WS] client connected (total: ${wss.clients.size})`);
+  ws.send(JSON.stringify(Array.from(sessions.values())));
+  ws.on('close', () => {
+    console.log(`[WS] client disconnected (total: ${wss.clients.size})`);
+  });
+});
 
 // GET /api/sessions — list all sessions
 app.get('/api/sessions', (_req: Request, res: Response) => {
@@ -49,6 +70,7 @@ app.post('/api/sessions', (req: Request, res: Response) => {
     existing.githubIssues = [];
     existing.lastUpdated = new Date().toISOString();
     res.json(existing);
+    broadcast();
     return;
   }
 
@@ -66,6 +88,7 @@ app.post('/api/sessions', (req: Request, res: Response) => {
 
   sessions.set(directory, session);
   res.status(201).json(session);
+  broadcast();
 });
 
 // PUT /api/sessions — update a session
@@ -111,7 +134,7 @@ app.put('/api/sessions', (req: Request, res: Response) => {
   if (summary !== undefined) session.summary = summary;
   if (status !== undefined) {
     if (isSubdirRouted) {
-      const priority: Record<string, number> = { idle: 0, busy: 1, waiting: 2 };
+      const priority: Record<string, number> = { stopped: -1, idle: 0, busy: 1, waiting: 2 };
       if ((priority[status] ?? 0) > (priority[session.status] ?? 0)) {
         session.status = status;
       }
@@ -125,6 +148,7 @@ app.put('/api/sessions', (req: Request, res: Response) => {
   console.log(`[PUT]   result: session="${session.directory}" status=${prevStatus}->${session.status}`);
 
   res.json(session);
+  broadcast();
 });
 
 // DELETE /api/sessions — remove a session
@@ -137,6 +161,7 @@ app.delete('/api/sessions', (req: Request, res: Response) => {
   console.log(`[DELETE] directory="${directory}" | existed=${sessions.has(directory)}`);
   sessions.delete(directory);
   res.status(204).end();
+  broadcast();
 });
 
 // POST /api/sessions/tasks — add a task to a session
@@ -158,6 +183,7 @@ app.post('/api/sessions/tasks', (req: Request, res: Response) => {
   session.lastUpdated = new Date().toISOString();
   console.log(`[POST tasks] directory="${directory}" task="${text.slice(0, 60)}" id=${task.id}`);
   res.status(201).json(task);
+  broadcast();
 });
 
 // PUT /api/sessions/tasks — update a task
@@ -194,6 +220,7 @@ app.put('/api/sessions/tasks', (req: Request, res: Response) => {
   session.lastUpdated = new Date().toISOString();
   console.log(`[PUT tasks] directory="${directory}" taskId=${taskId} completed=${task.completed}`);
   res.json(task);
+  broadcast();
 });
 
 // DELETE /api/sessions/tasks — delete a task
@@ -214,8 +241,9 @@ app.delete('/api/sessions/tasks', (req: Request, res: Response) => {
   session.lastUpdated = new Date().toISOString();
   console.log(`[DELETE tasks] directory="${directory}" taskId=${taskId}`);
   res.status(204).end();
+  broadcast();
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Claude Second Screen dashboard running at http://localhost:${PORT}`);
 });

@@ -22,6 +22,8 @@
   --red-bg: rgba(248, 81, 73, 0.08);
   --red-border: rgba(248, 81, 73, 0.4);
   --blue: #58a6ff;
+  --gray: #6e7681;
+  --gray-bg: rgba(110, 118, 129, 0.06);
   --radius: 8px;
 }
 
@@ -164,6 +166,7 @@ h1 {
 .group-heading.waiting { color: var(--red); }
 .group-heading.busy { color: var(--yellow); }
 .group-heading.idle { color: var(--green); }
+.group-heading.stopped { color: var(--gray); }
 
 .group-count {
   font-size: 11px;
@@ -206,6 +209,17 @@ h1 {
   background: var(--red-bg);
 }
 
+.card.stopped {
+  border-left-color: var(--gray);
+  background: var(--gray-bg);
+  opacity: 0.55;
+  transition: border-color 0.2s, background 0.2s, opacity 0.2s;
+}
+
+.card.stopped:hover {
+  opacity: 0.8;
+}
+
 .card-header {
   display: flex;
   align-items: center;
@@ -235,6 +249,10 @@ h1 {
   background: var(--red);
   box-shadow: 0 0 6px var(--red);
   animation: pulse 1s ease-in-out infinite;
+}
+
+.card.stopped .status-indicator {
+  background: var(--gray);
 }
 
 @keyframes pulse {
@@ -277,6 +295,11 @@ h1 {
   background: rgba(248, 81, 73, 0.15);
 }
 
+.card.stopped .card-status-label {
+  color: var(--gray);
+  background: rgba(110, 118, 129, 0.15);
+}
+
 .card-status-label.clickable {
   cursor: pointer;
   transition: background 0.15s;
@@ -284,6 +307,10 @@ h1 {
 
 .card-status-label.clickable:hover {
   background: rgba(248, 81, 73, 0.35);
+}
+
+.card.stopped .card-status-label.clickable:hover {
+  background: rgba(110, 118, 129, 0.35);
 }
 
 .card-path {

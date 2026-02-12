@@ -10,7 +10,7 @@ export interface Task {
   completedAt?: string;
 }
 
-export type SessionStatus = 'idle' | 'busy' | 'waiting';
+export type SessionStatus = 'idle' | 'busy' | 'waiting' | 'stopped';
 
 export interface Session {
   directory: string;

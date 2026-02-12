@@ -6,6 +6,7 @@ Cards are color-coded by session state:
 - **Green** — session is idle (just shows the directory name)
 - **Yellow** — session is actively working
 - **Red** — session is waiting for your input
+- **Gray** — session has ended (archived)
 
 Each card shows GitHub issue references (clickable) and a per-session task list you can manage from the dashboard.
 
@@ -72,6 +73,17 @@ Add the following to your `.claude/settings.json` (project-level or global `~/.c
           {
             "type": "command",
             "command": "bash /absolute/path/to/claude-second-screen/hooks/set-idle.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /absolute/path/to/claude-second-screen/hooks/stop-session.sh"
           }
         ]
       }

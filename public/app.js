@@ -2,6 +2,39 @@ const API = '';
 const POLL_INTERVAL = 2000;
 
 let previousData = null;
+let pollTimer = null;
+
+function connectWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${proto}//${location.host}`);
+
+  ws.addEventListener('open', () => {
+    setConnected(true);
+    // Stop fallback polling while WS is connected
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  });
+
+  ws.addEventListener('message', (event) => {
+    const dataStr = event.data;
+    if (dataStr !== previousData) {
+      previousData = dataStr;
+      render(JSON.parse(dataStr));
+    }
+  });
+
+  ws.addEventListener('close', () => {
+    setConnected(false);
+    // Fall back to polling while disconnected
+    if (!pollTimer) {
+      pollTimer = setInterval(poll, POLL_INTERVAL);
+    }
+    // Attempt reconnect after 3s
+    setTimeout(connectWebSocket, 3000);
+  });
+}
 
 async function fetchSessions() {
   try {
@@ -18,7 +51,7 @@ async function fetchSessions() {
 function setConnected(connected) {
   const el = document.getElementById('connectionStatus');
   el.classList.toggle('disconnected', !connected);
-  el.querySelector('.status-text').textContent = connected ? 'Connected' : 'Disconnected';
+  el.querySelector('.status-text').textContent = connected ? 'Connected' : 'Reconnecting...';
 }
 
 function getSortMode() {
@@ -37,7 +70,7 @@ function applySortWithin(sessions) {
     sessions.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
   } else {
     // Default: status priority — waiting first, then busy, then idle
-    const order = { waiting: 0, busy: 1, idle: 2 };
+    const order = { waiting: 0, busy: 1, idle: 2, stopped: 3 };
     sessions.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
   }
 }
@@ -47,6 +80,7 @@ function renderGrouped(sessions) {
     { key: 'waiting', label: 'Awaiting Input' },
     { key: 'busy', label: 'Active' },
     { key: 'idle', label: 'Idle' },
+    { key: 'stopped', label: 'Archived' },
   ];
 
   return groups
@@ -95,6 +129,7 @@ function cardHTML(session) {
     idle: 'Idle',
     busy: 'Busy',
     waiting: 'Awaiting Input',
+    stopped: 'Archived',
   };
 
   const issuesHTML =
@@ -152,7 +187,7 @@ function cardHTML(session) {
       <div class="card-header">
         <div class="status-indicator"></div>
         <span class="card-dir-name">${escapeHTML(session.directoryName)}</span>
-        <span class="card-status-label${session.status === 'waiting' ? ' clickable' : ''}">${statusLabels[session.status] || session.status}</span>
+        <span class="card-status-label${session.status === 'waiting' || session.status === 'stopped' ? ' clickable' : ''}">${statusLabels[session.status] || session.status}</span>
         <button class="card-remove" title="Remove session">&times;</button>
       </div>
       <div class="card-path" title="${escapeAttr(session.directory)}">${escapeHTML(session.summary || session.directory)}</div>
@@ -209,12 +244,16 @@ function attachCardListeners() {
     });
   });
 
-  // Click "Awaiting Input" to mark session as idle
+  // Click status label to mark session as idle (waiting → idle, stopped → idle)
   document.querySelectorAll('.card-status-label.clickable').forEach((label) => {
     label.addEventListener('click', async () => {
       const card = label.closest('.card');
       const dir = card.dataset.dir;
-      if (!confirm('Mark this session as idle?')) return;
+      const isStopped = card.classList.contains('stopped');
+      const msg = isStopped
+        ? 'Restore this archived session to idle?'
+        : 'Mark this session as idle?';
+      if (!confirm(msg)) return;
       await fetch(`${API}/api/sessions`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -301,6 +340,6 @@ groupToggle.addEventListener('click', () => {
   poll();
 });
 
-// Start polling
+// Start WebSocket connection with initial poll for immediate render
+connectWebSocket();
 poll();
-setInterval(poll, POLL_INTERVAL);
