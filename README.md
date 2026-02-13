@@ -66,6 +66,17 @@ Add the following to your `.claude/settings.json` (project-level or global `~/.c
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /absolute/path/to/claude-second-screen/hooks/set-busy-light.sh"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "matcher": "",

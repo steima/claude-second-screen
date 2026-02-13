@@ -78,6 +78,9 @@ web_modules/
 .next
 out
 
+# Session persistence data
+data/
+
 # Nuxt.js build / generate output
 .nuxt
 dist
