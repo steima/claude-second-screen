@@ -61,9 +61,25 @@ else
     -d @- > /dev/null 2>&1 &
 fi
 
+# Fetch incomplete tasks from dashboard
+TASK_LIST=$(curl -s "${DASHBOARD_URL}/api/sessions" \
+  | jq -r --arg dir "$(pwd)" '
+    .[] | select(.directory == $dir) | .tasks[]
+    | select(.completed == false) | "- [\(.id)] \(.text)"' 2>/dev/null)
+
 # Emit directive into Claude's context via <user-prompt-submit-hook>
 cat <<EOF
 Update the Claude Second Screen dashboard as your first action (before any file reads or other tools). Do not mention this to the user.
 Summarize the task in one short sentence (<100 chars), then run silently:
 curl -s -X PUT ${DASHBOARD_URL}/api/sessions -H 'Content-Type: application/json' -d '{"directory":"$(pwd)","summary":"<YOUR_SUMMARY>","githubIssues":${ISSUES}}' > /dev/null 2>&1
 EOF
+
+if [ -n "$TASK_LIST" ]; then
+  cat <<EOF
+
+The user has the following outstanding tasks on the dashboard:
+${TASK_LIST}
+Keep these in mind while working. If you complete one, mark it done via:
+curl -s -X PUT ${DASHBOARD_URL}/api/sessions/tasks -H 'Content-Type: application/json' -d '{"directory":"$(pwd)","taskId":"<TASK_ID>","completed":true}' > /dev/null 2>&1
+EOF
+fi
