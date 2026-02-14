@@ -99,6 +99,21 @@ function broadcast(): void {
   }
 }
 
+const TASK_TTL_MS = 5 * 60 * 1000;
+
+function purgeExpiredTasks(): boolean {
+  const cutoff = Date.now() - TASK_TTL_MS;
+  let changed = false;
+  for (const session of sessions.values()) {
+    const before = session.tasks.length;
+    session.tasks = session.tasks.filter(
+      (t) => !t.completed || !t.completedAt || new Date(t.completedAt).getTime() > cutoff
+    );
+    if (session.tasks.length < before) changed = true;
+  }
+  return changed;
+}
+
 wss.on('connection', (ws) => {
   console.log(`[WS] client connected (total: ${wss.clients.size})`);
   ws.send(JSON.stringify(Array.from(sessions.values())));
@@ -129,6 +144,7 @@ app.post('/api/sessions', (req: Request, res: Response) => {
       console.log(`[POST]   re-registering existing session, resetting summary`);
       existing.summary = '';
       existing.githubIssues = [];
+      existing.tasks = existing.tasks.filter((t) => !t.completed);
     } else {
       console.log(`[POST]   resuming existing session, preserving summary`);
     }
@@ -324,6 +340,21 @@ app.delete('/api/sessions/tasks', (req: Request, res: Response) => {
 // --- Startup ---
 fs.mkdirSync(DATA_DIR, { recursive: true });
 loadSessions();
+
+// Clean up stale completed tasks from previous run
+if (purgeExpiredTasks()) {
+  console.log('[cleanup] purged stale completed tasks from loaded data');
+  saveSessions();
+}
+
+// Purge completed tasks every 60 seconds
+setInterval(() => {
+  if (purgeExpiredTasks()) {
+    console.log('[cleanup] purged expired completed tasks');
+    broadcast();
+    scheduleSave();
+  }
+}, 60_000);
 
 server.listen(PORT, () => {
   console.log(`Claude Second Screen dashboard running at http://localhost:${PORT}`);

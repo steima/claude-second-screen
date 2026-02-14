@@ -151,7 +151,7 @@ function cardHTML(session) {
   const now = Date.now();
   const visibleTasks = (session.tasks || []).filter((t) => {
     if (!t.completed || !t.completedAt) return true;
-    return now - new Date(t.completedAt).getTime() < 6 * 60 * 1000;
+    return now - new Date(t.completedAt).getTime() < 5 * 60 * 1000;
   });
 
   const tasksHTML =
