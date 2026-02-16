@@ -14,4 +14,4 @@ DASHBOARD_URL="${CLAUDE_SECOND_SCREEN_URL:-http://localhost:3456}"
 
 curl -s -X PUT "${DASHBOARD_URL}/api/sessions" \
   -H 'Content-Type: application/json' \
-  -d "{\"directory\": \"$(pwd)\", \"status\": \"idle\"}" > /dev/null 2>&1 &
+  -d "{\"directory\": \"$(pwd)\", \"status\": \"idle\"}" > /dev/null 2>&1
