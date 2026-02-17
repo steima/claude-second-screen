@@ -410,6 +410,15 @@ h1 {
   font-size: 13px;
   color: var(--text-primary);
   flex: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  transition: background 0.15s;
+}
+
+.task-text:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .task-text.completed {
@@ -425,24 +434,42 @@ h1 {
   opacity: 0.25;
 }
 
+.task-edit,
 .task-delete {
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
   padding: 0 4px;
   line-height: 1;
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
 }
 
+.task-item:hover .task-edit,
 .task-item:hover .task-delete {
   opacity: 1;
 }
 
+.task-edit:hover {
+  color: var(--blue);
+}
+
 .task-delete:hover {
   color: var(--red);
+}
+
+.task-edit-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--blue);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  font-family: inherit;
 }
 
 /* Add task input */

@@ -100,6 +100,7 @@ function broadcast(): void {
 }
 
 const TASK_TTL_MS = 5 * 60 * 1000;
+const SESSION_ARCHIVE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function purgeExpiredTasks(): boolean {
   const cutoff = Date.now() - TASK_TTL_MS;
@@ -110,6 +111,23 @@ function purgeExpiredTasks(): boolean {
       (t) => !t.completed || !t.completedAt || new Date(t.completedAt).getTime() > cutoff
     );
     if (session.tasks.length < before) changed = true;
+  }
+  return changed;
+}
+
+function purgeExpiredSessions(): boolean {
+  const cutoff = Date.now() - SESSION_ARCHIVE_TTL_MS;
+  let changed = false;
+  for (const [dir, session] of sessions) {
+    if (
+      session.status === 'stopped' &&
+      new Date(session.lastUpdated).getTime() < cutoff &&
+      session.tasks.every((t) => t.completed)
+    ) {
+      console.log(`[cleanup] removing archived session "${dir}" (since ${session.lastUpdated})`);
+      sessions.delete(dir);
+      changed = true;
+    }
   }
   return changed;
 }
@@ -341,16 +359,22 @@ app.delete('/api/sessions/tasks', (req: Request, res: Response) => {
 fs.mkdirSync(DATA_DIR, { recursive: true });
 loadSessions();
 
-// Clean up stale completed tasks from previous run
-if (purgeExpiredTasks()) {
-  console.log('[cleanup] purged stale completed tasks from loaded data');
-  saveSessions();
+// Clean up stale data from previous run
+{
+  const tasksChanged = purgeExpiredTasks();
+  const sessionsChanged = purgeExpiredSessions();
+  if (tasksChanged) console.log('[cleanup] purged stale completed tasks from loaded data');
+  if (sessionsChanged) console.log('[cleanup] purged stale archived sessions from loaded data');
+  if (tasksChanged || sessionsChanged) saveSessions();
 }
 
-// Purge completed tasks every 60 seconds
+// Purge expired tasks and archived sessions every 60 seconds
 setInterval(() => {
-  if (purgeExpiredTasks()) {
-    console.log('[cleanup] purged expired completed tasks');
+  const tasksChanged = purgeExpiredTasks();
+  const sessionsChanged = purgeExpiredSessions();
+  if (tasksChanged || sessionsChanged) {
+    if (tasksChanged) console.log('[cleanup] purged expired completed tasks');
+    if (sessionsChanged) console.log('[cleanup] purged expired archived sessions');
     broadcast();
     scheduleSave();
   }

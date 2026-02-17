@@ -171,6 +171,7 @@ function cardHTML(session) {
             <div class="task-item ${fadeClass}" data-dir="${escapeAttr(session.directory)}" data-task-id="${escapeAttr(t.id)}">
               <input type="checkbox" ${t.completed ? 'checked' : ''} title="Toggle task">
               <span class="task-text ${t.completed ? 'completed' : ''}">${escapeHTML(t.text)}</span>
+              <button class="task-edit" title="Edit task">&#9998;</button>
               <button class="task-delete" title="Delete task">&times;</button>
             </div>
           `;
@@ -202,7 +203,7 @@ function cardHTML(session) {
 }
 
 function attachCardListeners() {
-  // Toggle task checkboxes
+  // Toggle task via checkbox
   document.querySelectorAll('.task-item input[type="checkbox"]').forEach((cb) => {
     cb.addEventListener('change', async (e) => {
       const item = e.target.closest('.task-item');
@@ -214,6 +215,68 @@ function attachCardListeners() {
         body: JSON.stringify({ directory: dir, taskId, completed: e.target.checked }),
       });
       poll();
+    });
+  });
+
+  // Toggle task via clicking text
+  document.querySelectorAll('.task-text').forEach((span) => {
+    span.addEventListener('click', async () => {
+      const item = span.closest('.task-item');
+      const dir = item.dataset.dir;
+      const taskId = item.dataset.taskId;
+      const cb = item.querySelector('input[type="checkbox"]');
+      const completed = !cb.checked;
+      await fetch(`${API}/api/sessions/tasks`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directory: dir, taskId, completed }),
+      });
+      poll();
+    });
+  });
+
+  // Edit task
+  document.querySelectorAll('.task-edit').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const item = e.target.closest('.task-item');
+      const span = item.querySelector('.task-text');
+      const currentText = span.textContent;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'task-edit-input';
+      input.value = currentText;
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+
+      // Hide edit/delete buttons while editing
+      item.querySelector('.task-edit').style.display = 'none';
+      item.querySelector('.task-delete').style.display = 'none';
+
+      async function save() {
+        const newText = input.value.trim();
+        if (newText && newText !== currentText) {
+          const dir = item.dataset.dir;
+          const taskId = item.dataset.taskId;
+          await fetch(`${API}/api/sessions/tasks`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ directory: dir, taskId, text: newText }),
+          });
+        }
+        poll();
+      }
+
+      function cancel() {
+        poll(); // re-render restores original state
+      }
+
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+        if (ev.key === 'Escape') { ev.preventDefault(); cancel(); }
+      });
+      input.addEventListener('blur', save);
     });
   });
 
